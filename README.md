@@ -15,23 +15,37 @@ Medir cuantitativamente el desempeño de `whisper-large-v3` sobre muestras de au
 ### Flujo del experimento
 
 ```
-audios_yucatan/          ← Muestras de audio (MP3, WAV, M4A)
+audios_yucatan/              ← Muestras de audio (Audio1–Audio4.mpeg)
        │
        ▼
  Groq API (whisper-large-v3)
        │
        ▼
-resultados_evaluacion.csv  ← Transcripciones + estado por archivo
+main.py                      ← Transcripción y evaluación principal
+comparar_transcripciones.py  ← Comparación con referencias manuales (WER)
+analisis_alucinaciones.py    ← Detección de alucinaciones del modelo
+       │
+       ▼
+datos/                       ← Transcripciones de referencia y segmentos
+metricas_transcripcion.csv   ← Métricas por audio
+resultados_colab.csv         ← Resultados de sesión Colab
+resumen_metricas.csv         ← Resumen agregado de métricas
+grafica_wer_por_audio.png    ← Gráfica WER por audio
+grafica_patrones_error.png   ← Gráfica de patrones de error
 ```
 
-### Salida
+### Salidas
 
-Un CSV con columnas:
-- `Nombre_Archivo` — identificador de la muestra de audio
-- `Transcripcion_Whisper` — texto generado por el modelo
-- `Estado` — `Éxito` / `Error`
+**CSVs:**
+- `metricas_transcripcion.csv` — WER, CER y métricas por audio
+- `resultados_colab.csv` — transcripciones + estado por archivo
+- `resumen_metricas.csv` — resumen agregado del experimento
 
-Los resultados permiten analizar errores de transcripción, omisiones y distorsiones frente a dialectos rurales.
+**Gráficas:**
+- `grafica_wer_por_audio.png` — Word Error Rate por muestra de audio
+- `grafica_patrones_error.png` — distribución de tipos de error detectados
+
+Los resultados permiten analizar errores de transcripción, omisiones, alucinaciones y distorsiones frente a dialectos rurales yucatecos.
 
 ---
 
@@ -42,7 +56,7 @@ Los resultados permiten analizar errores de transcripción, omisiones y distorsi
 | Modelo de transcripción | `whisper-large-v3` (OpenAI, vía Groq) |
 | Backend API | [Groq](https://console.groq.com/) — tier gratuito |
 | Lenguaje | Python 3.11+ |
-| Librerías | `groq`, `pandas`, `python-dotenv` |
+| Librerías | `groq`, `pandas`, `python-dotenv`, `jiwer`, `matplotlib` |
 
 ---
 
@@ -75,8 +89,14 @@ echo "GROQ_API_KEY=gsk_..." > .env
 # 4. Colocar audios en la carpeta
 # Copia tus archivos .mp3, .wav o .m4a en audios_yucatan/
 
-# 5. Ejecutar la evaluación
+# 5. Ejecutar la evaluación principal
 python main.py
+
+# 6. Comparar transcripciones contra referencias manuales
+python comparar_transcripciones.py
+
+# 7. Analizar alucinaciones del modelo
+python analisis_alucinaciones.py
 ```
 
 ---
