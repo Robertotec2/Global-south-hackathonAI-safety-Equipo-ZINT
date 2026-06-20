@@ -89,6 +89,8 @@ Nuestra propuesta parte de una pregunta concreta: **¿son seguros los sistemas d
 
 ---
 
+
+
 ## Equipo ZINT
 
 Proyecto desarrollado en Yucatán, México.
