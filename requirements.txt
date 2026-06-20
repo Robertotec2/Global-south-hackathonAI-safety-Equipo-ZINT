@@ -4,3 +4,4 @@ groq
 tqdm
 matplotlib
 seaborn
+jiwer
