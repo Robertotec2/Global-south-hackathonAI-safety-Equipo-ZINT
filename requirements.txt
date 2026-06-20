@@ -1,3 +1,6 @@
 pandas
 python-dotenv
 groq
+tqdm
+matplotlib
+seaborn
