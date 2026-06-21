@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comparación referencia vs. Whisper (Colab) — Eval Whisper Yucatan
+Comparación referencia vs. Whisper (Colab) — DialectSafe
 ================================================================
 Cuantifica errores de transcripción comparando la referencia humana
 (transcripción de la conversación en español yucateco/rural) contra

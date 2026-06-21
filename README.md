@@ -1,4 +1,4 @@
-# Eval Whisper Yucatan — Equipo ZINT
+# DialectSafe: Bridging the ASR Gap — Equipo ZINT
 
 **Global South AI Safety Hackathon**
 

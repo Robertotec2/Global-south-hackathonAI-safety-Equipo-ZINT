@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Eval Whisper Yucatan — Benchmark determinista Whisper vs. Gemini 1.5
+DialectSafe: Bridging the ASR Gap — Benchmark determinista Whisper vs. Gemini
 ====================================================================
 Compara transcripciones automaticas contra ground truth humano y cuantifica:
   - WER y CER (jiwer)
@@ -284,7 +284,7 @@ def save_wer_chart(results_df: pd.DataFrame) -> None:
     )
 
     ax.set_title(
-        "Eval Whisper Yucatan — WER promedio\n"
+        "DialectSafe — WER promedio\n"
         "Espanol rural + maya yucateco (ground truth humano)",
         fontsize=13,
         fontweight="bold",
@@ -386,7 +386,7 @@ def save_typology_chart(results_df: pd.DataFrame) -> None:
 def print_summary(results_df: pd.DataFrame) -> None:
     n = len(results_df)
     print("\n" + "=" * 68)
-    print("EVAL WHISPER YUCATAN — BENCHMARK DETERMINISTA")
+    print("DIALECTSAFE — BENCHMARK DETERMINISTA")
     print("=" * 68)
     print(f"Audios evaluados       : {n}")
     print(f"WER promedio Whisper   : {results_df['WER_Whisper'].mean():.1%}")
