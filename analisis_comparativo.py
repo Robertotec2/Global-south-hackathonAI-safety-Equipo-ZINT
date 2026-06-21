@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
-Benchmark comparativo Whisper vs. Gemini — Eval Whisper Yucatan
-==============================================================
-Compara transcripciones automáticas contra ground truth humano
-(transcripciones_oficiales/) y cuantifica WER, reducción de error
-y genera visualización para el reporte del hackathon.
+Eval Whisper Yucatan — Benchmark determinista Whisper vs. Gemini 1.5
+====================================================================
+Compara transcripciones automaticas contra ground truth humano y cuantifica:
+  - WER y CER (jiwer)
+  - Reduccion de error (Gemini vs. Whisper)
+  - Tipologia de errores: sustituciones, omisiones, inserciones (process_words)
 
 Entrada : benchmark_whisper_vs_gemini.csv
           Columnas: Archivo, Transcripcion_Whisper, Transcripcion_Gemini
 Ground  : transcripciones_oficiales/TranscripcionOficialAudio{N}.txt
-Salida  : resultados_finales_benchmark.csv, comparativa_modelos.png
+Salidas : resultados_finales_benchmark.csv
+          comparativa_wer.png, tipologia_errores.png
 
 Uso: python analisis_comparativo.py
 """
@@ -24,26 +26,39 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from jiwer import wer
+from jiwer import cer, process_words, wer
 
-# ── Configuración ──────────────────────────────────────────────────────────
+# ── Configuracion ────────────────────────────────────────────────────────────
 INPUT_CSV = Path("benchmark_whisper_vs_gemini.csv")
 OFFICIAL_DIR = Path("transcripciones_oficiales")
 OUTPUT_CSV = Path("resultados_finales_benchmark.csv")
-CHART_PATH = Path("comparativa_modelos.png")
+CHART_WER = Path("comparativa_wer.png")
+CHART_TYPOLOGY = Path("tipologia_errores.png")
 
-# Nombres alternativos por si existen transcripciones con typo histórico
 OFFICIAL_PREFIX = "TranscripcionOficial"
 OFFICIAL_PREFIX_ALT = "TranscripcionOfical"
+
+OUTPUT_COLUMNS = [
+    "Archivo",
+    "Texto_Oficial",
+    "Transcripcion_Whisper",
+    "Transcripcion_Gemini",
+    "WER_Whisper",
+    "WER_Gemini",
+    "Reduccion_Error",
+    "Sustituciones_Whisper",
+    "Omisiones_Whisper",
+    "Inserciones_Whisper",
+    "Sustituciones_Gemini",
+    "Omisiones_Gemini",
+    "Inserciones_Gemini",
+]
 
 
 def extract_audio_base(archivo: str) -> str:
     """
-    Extrae la base del nombre de audio para mapear al ground truth.
-    Ejemplos:
-        'Audio1.mpeg'   -> 'Audio1'
-        'Audio 1.mp3'   -> 'Audio1'
-        'Audio7.mpeg'   -> 'Audio7'
+    Limpia extension y normaliza el nombre base del audio.
+    'Audio1.mpeg' -> 'Audio1' | 'Audio 7.mp3' -> 'Audio7'
     """
     stem = Path(str(archivo).strip()).stem
     match = re.search(r"(\d+)", stem, flags=re.IGNORECASE)
@@ -53,7 +68,7 @@ def extract_audio_base(archivo: str) -> str:
 
 
 def official_transcript_path(audio_base: str) -> Path | None:
-    """Resuelve la ruta del archivo de transcripción oficial."""
+    """Busca el txt oficial con convencion estricta (+ alias historico Ofical)."""
     candidates = [
         OFFICIAL_DIR / f"{OFFICIAL_PREFIX}{audio_base}.txt",
         OFFICIAL_DIR / f"{OFFICIAL_PREFIX_ALT}{audio_base}.txt",
@@ -65,7 +80,7 @@ def official_transcript_path(audio_base: str) -> Path | None:
 
 
 def normalize_text(text: str) -> str:
-    """Normaliza texto para comparación WER justa."""
+    """Normaliza texto para metricas ASR reproducibles."""
     if not isinstance(text, str):
         return ""
     text = text.lower().strip()
@@ -77,41 +92,73 @@ def normalize_text(text: str) -> str:
 
 
 def safe_wer(reference: str, hypothesis: str) -> float:
-    """Calcula WER con manejo de entradas vacías."""
+    ref = normalize_text(reference)
+    hyp = normalize_text(hypothesis)
+    if not ref and not hyp:
+        return 0.0
+    if not hyp or not ref:
+        return 1.0
+    return float(wer(ref, hyp))
+
+
+def safe_cer(reference: str, hypothesis: str) -> float:
+    ref = normalize_text(reference)
+    hyp = normalize_text(hypothesis)
+    if not ref and not hyp:
+        return 0.0
+    if not hyp or not ref:
+        return 1.0
+    return float(cer(ref, hyp))
+
+
+def error_reduction_pct(wer_whisper: float, wer_gemini: float) -> float:
+    """((WER_Whisper - WER_Gemini) / WER_Whisper) * 100"""
+    if wer_whisper == 0.0:
+        return 0.0 if wer_gemini == 0.0 else -100.0
+    return ((wer_whisper - wer_gemini) / wer_whisper) * 100.0
+
+
+def word_error_typology(reference: str, hypothesis: str) -> dict[str, int]:
+    """
+    Extrae conteos de sustituciones, omisiones e inserciones con jiwer.process_words.
+    """
     ref = normalize_text(reference)
     hyp = normalize_text(hypothesis)
 
     if not ref and not hyp:
-        return 0.0
+        return {"substitutions": 0, "deletions": 0, "insertions": 0, "hits": 0}
+
     if not hyp:
-        return 1.0
+        ref_words = ref.split()
+        return {
+            "substitutions": 0,
+            "deletions": len(ref_words),
+            "insertions": 0,
+            "hits": 0,
+        }
+
     if not ref:
-        return 1.0
+        hyp_words = hyp.split()
+        return {
+            "substitutions": 0,
+            "deletions": 0,
+            "insertions": len(hyp_words),
+            "hits": 0,
+        }
 
-    return float(wer(ref, hyp))
-
-
-def error_reduction_pct(wer_whisper: float, wer_gemini: float) -> float:
-    """
-    Porcentaje de reducción de error de Gemini respecto a Whisper.
-
-    Fórmula: ((WER_Whisper - WER_Gemini) / WER_Whisper) * 100
-
-    Valores positivos  -> Gemini cometió menos errores que Whisper.
-    Valores negativos  -> Gemini fue peor que Whisper.
-    """
-    if wer_whisper == 0.0:
-        if wer_gemini == 0.0:
-            return 0.0
-        return -100.0
-    return ((wer_whisper - wer_gemini) / wer_whisper) * 100.0
+    alignment = process_words(ref, hyp)
+    return {
+        "substitutions": alignment.substitutions,
+        "deletions": alignment.deletions,
+        "insertions": alignment.insertions,
+        "hits": alignment.hits,
+    }
 
 
 def load_benchmark_csv() -> pd.DataFrame:
-    """Lee el CSV de benchmark exportado desde Colab."""
     if not INPUT_CSV.exists():
         print(f"ERROR: No se encontro '{INPUT_CSV.resolve()}'.")
-        print("   Exporta desde Colab el archivo benchmark_whisper_vs_gemini.csv")
+        print("   Coloca el export de Colab: benchmark_whisper_vs_gemini.csv")
         sys.exit(1)
 
     try:
@@ -122,12 +169,12 @@ def load_benchmark_csv() -> pd.DataFrame:
     required = {"Archivo", "Transcripcion_Whisper", "Transcripcion_Gemini"}
     missing = required - set(df.columns)
     if missing:
-        print(f"ERROR: Faltan columnas en el CSV: {sorted(missing)}")
-        print(f"   Columnas encontradas: {list(df.columns)}")
+        print(f"ERROR: Faltan columnas: {sorted(missing)}")
+        print(f"   Encontradas: {list(df.columns)}")
         sys.exit(1)
 
     if df.empty:
-        print("ERROR: El archivo benchmark esta vacio.")
+        print("ERROR: benchmark_whisper_vs_gemini.csv esta vacio.")
         sys.exit(1)
 
     df["Archivo"] = df["Archivo"].astype(str).str.strip()
@@ -137,7 +184,6 @@ def load_benchmark_csv() -> pd.DataFrame:
 
 
 def load_official_text(path: Path) -> str:
-    """Carga el texto oficial desde archivo .txt."""
     try:
         return path.read_text(encoding="utf-8").strip()
     except UnicodeDecodeError:
@@ -145,37 +191,47 @@ def load_official_text(path: Path) -> str:
 
 
 def analyze_row(archivo: str, whisper: str, gemini: str) -> dict | None:
-    """Procesa una fila del benchmark; retorna None si falta ground truth."""
     audio_base = extract_audio_base(archivo)
     official_path = official_transcript_path(audio_base)
 
     if official_path is None:
-        expected = OFFICIAL_DIR / f"{OFFICIAL_PREFIX}{audio_base}.txt"
+        expected = f"{OFFICIAL_PREFIX}{audio_base}.txt"
         print(
-            f"ADVERTENCIA: Sin ground truth para '{archivo}' "
-            f"(esperado: {expected.name}). Fila omitida."
+            f"WARNING: Sin ground truth para '{archivo}' "
+            f"(esperado: {expected}). Fila omitida."
         )
         return None
 
     texto_oficial = load_official_text(official_path)
-    wer_whisper = safe_wer(texto_oficial, whisper)
-    wer_gemini = safe_wer(texto_oficial, gemini)
-    reduccion = error_reduction_pct(wer_whisper, wer_gemini)
+
+    wer_w = safe_wer(texto_oficial, whisper)
+    wer_g = safe_wer(texto_oficial, gemini)
+    cer_w = safe_cer(texto_oficial, whisper)
+    cer_g = safe_cer(texto_oficial, gemini)
+
+    typo_w = word_error_typology(texto_oficial, whisper)
+    typo_g = word_error_typology(texto_oficial, gemini)
 
     return {
         "Archivo": archivo,
         "Texto_Oficial": texto_oficial,
         "Transcripcion_Whisper": whisper,
         "Transcripcion_Gemini": gemini,
-        "WER_Whisper": round(wer_whisper, 4),
-        "WER_Gemini": round(wer_gemini, 4),
-        "Reduccion_Error": round(reduccion, 2),
-        "Archivo_Oficial": official_path.name,
+        "WER_Whisper": round(wer_w, 4),
+        "WER_Gemini": round(wer_g, 4),
+        "CER_Whisper": round(cer_w, 4),
+        "CER_Gemini": round(cer_g, 4),
+        "Reduccion_Error": round(error_reduction_pct(wer_w, wer_g), 2),
+        "Sustituciones_Whisper": typo_w["substitutions"],
+        "Omisiones_Whisper": typo_w["deletions"],
+        "Inserciones_Whisper": typo_w["insertions"],
+        "Sustituciones_Gemini": typo_g["substitutions"],
+        "Omisiones_Gemini": typo_g["deletions"],
+        "Inserciones_Gemini": typo_g["insertions"],
     }
 
 
 def build_results_dataframe(df_benchmark: pd.DataFrame) -> pd.DataFrame:
-    """Itera el benchmark y construye el DataFrame de resultados."""
     rows: list[dict] = []
 
     for _, row in df_benchmark.iterrows():
@@ -188,31 +244,34 @@ def build_results_dataframe(df_benchmark: pd.DataFrame) -> pd.DataFrame:
             rows.append(result)
 
     if not rows:
-        print("ERROR: Ninguna fila pudo evaluarse. Revisa transcripciones_oficiales/.")
+        print("ERROR: Ninguna fila evaluada. Revisa transcripciones_oficiales/.")
         sys.exit(1)
 
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    return df
 
 
-def save_comparison_chart(results_df: pd.DataFrame) -> None:
-    """
-    Figure 1 — Barras con WER promedio Whisper vs. Gemini.
-    Diseño limpio para reporte PDF del hackathon.
-    """
-    avg_whisper = results_df["WER_Whisper"].mean()
-    avg_gemini = results_df["WER_Gemini"].mean()
+def export_results_csv(results_df: pd.DataFrame) -> None:
+    """Exporta solo las columnas requeridas por el benchmark."""
+    results_df[OUTPUT_COLUMNS].to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
 
+
+def save_wer_chart(results_df: pd.DataFrame) -> None:
+    """Grafica 1: WER promedio Whisper vs Gemini."""
     summary = pd.DataFrame(
         {
-            "Modelo": ["Whisper-large-v3", "Gemini"],
-            "WER_Promedio": [avg_whisper, avg_gemini],
+            "Modelo": ["Whisper-large-v3", "Gemini 1.5"],
+            "WER_Promedio": [
+                results_df["WER_Whisper"].mean(),
+                results_df["WER_Gemini"].mean(),
+            ],
         }
     )
 
     sns.set_theme(style="whitegrid", context="talk", font_scale=1.05)
     fig, ax = plt.subplots(figsize=(8, 6))
 
-    palette = ["#E45756", "#4C78A8"]
+    palette = {"Whisper-large-v3": "#E45756", "Gemini 1.5": "#4C78A8"}
     bars = sns.barplot(
         data=summary,
         x="Modelo",
@@ -225,83 +284,148 @@ def save_comparison_chart(results_df: pd.DataFrame) -> None:
     )
 
     ax.set_title(
-        "Benchmark Eval Whisper Yucatan\nWER promedio vs. transcripciones oficiales",
-        fontsize=14,
+        "Eval Whisper Yucatan — WER promedio\n"
+        "Espanol rural + maya yucateco (ground truth humano)",
+        fontsize=13,
         fontweight="bold",
         pad=14,
     )
-    ax.set_xlabel("Modelo de transcripcion", fontsize=12)
-    ax.set_ylabel("Word Error Rate (WER)", fontsize=12)
-    ax.set_ylim(0, min(1.05, max(avg_whisper, avg_gemini) * 1.25 + 0.05))
+    ax.set_xlabel("Modelo ASR")
+    ax.set_ylabel("Word Error Rate (WER)")
+    ax.set_ylim(0, min(1.05, summary["WER_Promedio"].max() * 1.2 + 0.05))
 
     for container in bars.containers:
-        ax.bar_label(
-            container,
-            fmt=lambda v: f"{v:.1%}",
-            padding=4,
-            fontsize=11,
-            fontweight="bold",
-        )
+        ax.bar_label(container, fmt=lambda v: f"{v:.1%}", padding=4, fontweight="bold")
 
-    ax.axhline(y=0, color="black", linewidth=0.8)
     plt.tight_layout()
-    fig.savefig(CHART_PATH, dpi=150, bbox_inches="tight")
+    fig.savefig(CHART_WER, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_typology_chart(results_df: pd.DataFrame) -> None:
+    """
+    Grafica 2: barras apiladas con proporcion de S / D / I por modelo.
+    Evidencia si Whisper sufre mas sordera digital (omisiones).
+    """
+    whisper_totals = {
+        "Sustituciones": results_df["Sustituciones_Whisper"].sum(),
+        "Omisiones": results_df["Omisiones_Whisper"].sum(),
+        "Inserciones": results_df["Inserciones_Whisper"].sum(),
+    }
+    gemini_totals = {
+        "Sustituciones": results_df["Sustituciones_Gemini"].sum(),
+        "Omisiones": results_df["Omisiones_Gemini"].sum(),
+        "Inserciones": results_df["Inserciones_Gemini"].sum(),
+    }
+
+    records: list[dict] = []
+    for modelo, totals in [("Whisper-large-v3", whisper_totals), ("Gemini 1.5", gemini_totals)]:
+        grand = sum(totals.values()) or 1
+        for tipo, count in totals.items():
+            records.append(
+                {
+                    "Modelo": modelo,
+                    "Tipo_Error": tipo,
+                    "Conteo": int(count),
+                    "Proporcion": count / grand,
+                }
+            )
+
+    plot_df = pd.DataFrame(records)
+    tipo_order = ["Sustituciones", "Omisiones", "Inserciones"]
+    palette = {
+        "Sustituciones": "#F58518",
+        "Omisiones": "#E45756",
+        "Inserciones": "#72B7B2",
+    }
+
+    sns.set_theme(style="whitegrid", context="talk", font_scale=1.0)
+    fig, ax = plt.subplots(figsize=(9, 6))
+
+    bottom = {model: 0.0 for model in plot_df["Modelo"].unique()}
+    x_positions = range(len(bottom))
+    model_labels = list(bottom.keys())
+
+    for tipo in tipo_order:
+        values = []
+        for model in model_labels:
+            row = plot_df[(plot_df["Modelo"] == model) & (plot_df["Tipo_Error"] == tipo)]
+            values.append(float(row["Proporcion"].iloc[0]) if not row.empty else 0.0)
+
+        ax.bar(
+            x_positions,
+            values,
+            bottom=[bottom[m] for m in model_labels],
+            label=tipo,
+            color=palette[tipo],
+            width=0.55,
+            edgecolor="white",
+            linewidth=0.8,
+        )
+        for i, model in enumerate(model_labels):
+            bottom[model] += values[i]
+
+    ax.set_xticks(list(x_positions))
+    ax.set_xticklabels(model_labels)
+    ax.set_ylim(0, 1.05)
+    ax.set_ylabel("Proporcion de errores")
+    ax.set_xlabel("Modelo ASR")
+    ax.set_title(
+        "Tipologia de errores — Sustituciones / Omisiones / Inserciones\n"
+        "Omisiones altas en Whisper = mayor sordera digital",
+        fontsize=13,
+        fontweight="bold",
+        pad=14,
+    )
+    ax.legend(title="Tipo de error", loc="upper right")
+    plt.tight_layout()
+    fig.savefig(CHART_TYPOLOGY, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 
 def print_summary(results_df: pd.DataFrame) -> None:
-    """Resumen en consola."""
     n = len(results_df)
-    avg_w = results_df["WER_Whisper"].mean()
-    avg_g = results_df["WER_Gemini"].mean()
-    avg_red = results_df["Reduccion_Error"].mean()
-    gemini_wins = (results_df["WER_Gemini"] < results_df["WER_Whisper"]).sum()
-
-    print("\n" + "=" * 62)
-    print("BENCHMARK COMPARATIVO — Eval Whisper Yucatan")
-    print("=" * 62)
-    print(f"Audios evaluados     : {n}")
-    print(f"WER promedio Whisper : {avg_w:.1%}")
-    print(f"WER promedio Gemini  : {avg_g:.1%}")
-    print(f"Reduccion error prom.: {avg_red:+.1f}%")
-    print(f"Gemini gano en       : {gemini_wins}/{n} audios")
-    print("-" * 62)
+    print("\n" + "=" * 68)
+    print("EVAL WHISPER YUCATAN — BENCHMARK DETERMINISTA")
+    print("=" * 68)
+    print(f"Audios evaluados       : {n}")
+    print(f"WER promedio Whisper   : {results_df['WER_Whisper'].mean():.1%}")
+    print(f"WER promedio Gemini    : {results_df['WER_Gemini'].mean():.1%}")
+    print(f"CER promedio Whisper   : {results_df['CER_Whisper'].mean():.1%}")
+    print(f"CER promedio Gemini    : {results_df['CER_Gemini'].mean():.1%}")
+    print(f"Reduccion error prom.  : {results_df['Reduccion_Error'].mean():+.1f}%")
+    print(f"Omisiones totales W    : {results_df['Omisiones_Whisper'].sum()}")
+    print(f"Omisiones totales G    : {results_df['Omisiones_Gemini'].sum()}")
+    print("-" * 68)
 
     for _, row in results_df.iterrows():
         print(
-            f"{row['Archivo']:<16} | WER W:{row['WER_Whisper']:.1%} "
-            f"G:{row['WER_Gemini']:.1%} | Reduccion:{row['Reduccion_Error']:+.1f}%"
+            f"{row['Archivo']:<14} | WER W:{row['WER_Whisper']:.1%} G:{row['WER_Gemini']:.1%} "
+            f"| Red:{row['Reduccion_Error']:+.1f}% "
+            f"| Omis W:{row['Omisiones_Whisper']} G:{row['Omisiones_Gemini']}"
         )
 
-    print("=" * 62)
-    print(f"CSV  : {OUTPUT_CSV.resolve()}")
-    print(f"Chart: {CHART_PATH.resolve()}")
-    print("=" * 62 + "\n")
+    print("=" * 68)
+    print(f"CSV    : {OUTPUT_CSV.resolve()}")
+    print(f"WER    : {CHART_WER.resolve()}")
+    print(f"Tipol. : {CHART_TYPOLOGY.resolve()}")
+    print("=" * 68 + "\n")
 
 
 def main() -> None:
     if not OFFICIAL_DIR.exists():
-        print(f"ERROR: Crea la carpeta '{OFFICIAL_DIR}/' con los archivos oficiales.")
-        print("   Ejemplo: transcripciones_oficiales/TranscripcionOficialAudio1.txt")
+        print(f"ERROR: Falta la carpeta '{OFFICIAL_DIR}/'.")
         sys.exit(1)
 
     df_benchmark = load_benchmark_csv()
-    print(f"Benchmark cargado : {INPUT_CSV} ({len(df_benchmark)} filas)")
-    print(f"Ground truth dir  : {OFFICIAL_DIR.resolve()}\n")
+    print(f"Benchmark : {INPUT_CSV} ({len(df_benchmark)} filas)")
+    print(f"Ground truth: {OFFICIAL_DIR.resolve()}\n")
 
     results_df = build_results_dataframe(df_benchmark)
 
-    try:
-        results_df.to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
-    except OSError as exc:
-        print(f"ERROR al guardar CSV: {exc}")
-        sys.exit(1)
-
-    try:
-        save_comparison_chart(results_df)
-    except Exception as exc:
-        print(f"ADVERTENCIA: No se pudo generar la grafica: {exc}")
-
+    export_results_csv(results_df)
+    save_wer_chart(results_df)
+    save_typology_chart(results_df)
     print_summary(results_df)
 
 
