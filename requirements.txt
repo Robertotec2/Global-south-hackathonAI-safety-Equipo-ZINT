@@ -5,3 +5,4 @@ tqdm
 matplotlib
 seaborn
 jiwer
+google-generativeai

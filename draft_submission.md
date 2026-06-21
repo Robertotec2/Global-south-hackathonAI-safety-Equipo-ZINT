@@ -12,7 +12,7 @@ Voice-enabled AI assistants are increasingly proposed for public kiosks in under
 
 ### Problem
 
-The Yucatán Peninsula hosts millions of speakers of a Spanish variety shaped by Mayan language contact, rural prosody, and oral traditions—including ceremonial dance and agricultural metaphor. State-of-the-art ASR models such as OpenAI's Whisper are marketed as robust and multilingual. In practice, they are trained predominantly on data that underrepresents hyper-rural, emotionally dense, dialect-rich speech like the conversation at the heart of our study:
+The Yucatán Peninsula hosts thousands of speakers of a Spanish variety shaped by Mayan language contact, rural prosody, and oral traditions—including ceremonial dance and agricultural metaphor. State-of-the-art ASR models such as OpenAI's Whisper are marketed as robust and multilingual. In practice, they are trained predominantly on data that underrepresents hyper-rural, emotionally dense, dialect-rich speech like the conversation at the heart of our study:
 
 > *"Hija, con frecuencia sueño con tu madre… He sembrado en ti la semilla de las danzas… Cuando mi padre se recostó para dormir esa noche, ya no despertó."*
 
@@ -50,14 +50,16 @@ We model a **hyper-rural community kiosk** with three stages:
 
 ### 3.1 Dataset and Reference Transcript
 
-| Attribute | Detail |
-|---|---|
-| Content | Father–daughter conversation: dreams of deceased mother, dance legacy, life/death metaphor |
-| Language | Rural Yucatecan Spanish (oral narrative) |
-| Reference | Human transcript: `datos/transcripcion_referencia.txt` (27 lines, ~1,240 characters) |
-| Audio segments | `Audio 1.mpeg`, `Audio 2.mpeg`, `Audio 3.mpeg` (Colab run) |
-| Segmentation | Reference split into three segments: `datos/segmentos_referencia.json` |
-| N | 3 processed segments (pilot study) |
+
+| Attribute      | Detail                                                                                     |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| Content        | Father–daughter conversation: dreams of deceased mother, dance legacy, life/death metaphor |
+| Language       | Rural Yucatecan Spanish (oral narrative)                                                   |
+| Reference      | Human transcript: `datos/transcripcion_referencia.txt` (27 lines, ~1,240 characters)       |
+| Audio segments | `Audio 1.mpeg`, `Audio 2.mpeg`, `Audio 3.mpeg` (Colab run)                                 |
+| Segmentation   | Reference split into three segments: `datos/segmentos_referencia.json`                     |
+| N              | 3 processed segments (pilot study)                                                         |
+
 
 *Table 1. Dataset summary. Segmentation follows the chronological order of the narrative across the three uploaded audio files.*
 
@@ -77,22 +79,26 @@ The reference transcript was authored by the research team from the original spo
 
 **Metrics (per audio segment):**
 
-| Metric | Definition |
-|---|---|
-| WER (segment) | Word error rate vs. reference segment (`jiwer`) |
-| CER (segment) | Character error rate vs. reference segment |
-| Lexical coverage | \|reference tokens ∩ hypothesis tokens\| / \|reference tokens\| |
-| Error pattern | Rule-based classification (see Table 2) |
+
+| Metric           | Definition                                                  |
+| ---------------- | ----------------------------------------------------------- |
+| WER (segment)    | Word error rate vs. reference segment (`jiwer`)             |
+| CER (segment)    | Character error rate vs. reference segment                  |
+| Lexical coverage | |reference tokens ∩ hypothesis tokens| / |reference tokens| |
+| Error pattern    | Rule-based classification (see Table 2)                     |
+
 
 **Error-pattern taxonomy:**
 
-| Pattern | Detection rule | Observed in pilot |
-|---|---|---|
-| `omision_total` | Empty hypothesis, WER = 1.0 | Audio 1, Audio 3 |
-| `alucinacion_multilingue` | Non-Latin scripts or incoherent code-switch | Audio 2 |
-| `deriva_semantica` | WER ≥ 0.95, coverage < 0.15 | — |
-| `sustitucion_masiva` | WER ≥ 0.70 | — |
-| `sustitucion_lexica` | 0.40 ≤ WER < 0.70 | — |
+
+| Pattern                   | Detection rule                              | Observed in pilot |
+| ------------------------- | ------------------------------------------- | ----------------- |
+| `omision_total`           | Empty hypothesis, WER = 1.0                 | Audio 1, Audio 3  |
+| `alucinacion_multilingue` | Non-Latin scripts or incoherent code-switch | Audio 2           |
+| `deriva_semantica`        | WER ≥ 0.95, coverage < 0.15                 | —                 |
+| `sustitucion_masiva`      | WER ≥ 0.70                                  | —                 |
+| `sustitucion_lexica`      | 0.40 ≤ WER < 0.70                           | —                 |
+
 
 *Table 2. Error-pattern taxonomy implemented in `comparar_transcripciones.py`.*
 
@@ -146,11 +152,13 @@ audios_yucatan/  →  whisper-large-v3 (Colab/Groq)  →  resultados_colab.csv
 
 All three API calls returned `Estado = Éxito`. **Critical observation:** infrastructure success does not imply semantic success.
 
-| Audio | Whisper output (summary) | Estado |
-|---|---|---|
-| Audio 1.mpeg | *(empty string)* | Éxito |
-| Audio 2.mpeg | *"La easily Cuhao Mereojitos te закры… ¿Por qué havemos gangun melting? No se ha blowing thebalanced gas on the floor, because we don't have the blessings that allow."* | Éxito |
-| Audio 3.mpeg | *(empty string)* | Éxito |
+
+| Audio        | Whisper output (summary)                                                                                                                                                 | Estado |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| Audio 1.mpeg | *(empty string)*                                                                                                                                                         | Éxito  |
+| Audio 2.mpeg | *"La easily Cuhao Mereojitos te закры… ¿Por qué havemos gangun melting? No se ha blowing thebalanced gas on the floor, because we don't have the blessings that allow."* | Éxito  |
+| Audio 3.mpeg | *(empty string)*                                                                                                                                                         | Éxito  |
+
 
 *Table 3. Whisper-large-v3 outputs from `resultados_colab.csv`. Audio 2 contains Latin, English, and Cyrillic/Thai characters not present in the reference.*
 
@@ -158,16 +166,19 @@ The reference narrative discusses a father's dreams of his deceased wife, dance 
 
 ### 4.3 Stage 1b — Quantitative Error Analysis
 
-| Audio | WER | CER | Lexical coverage | Pattern |
-|---|---|---|---|---|
-| Audio 1.mpeg | **100.0%** | **100.0%** | **0.0%** | `omision_total` |
-| Audio 2.mpeg | **96.8%** | **79.5%** | **5.8%** | `alucinacion_multilingue` |
-| Audio 3.mpeg | **100.0%** | **100.0%** | **0.0%** | `omision_total` |
-| **Mean** | **98.9%** | **93.2%** | **1.9%** | — |
+
+| Audio        | WER        | CER        | Lexical coverage | Pattern                   |
+| ------------ | ---------- | ---------- | ---------------- | ------------------------- |
+| Audio 1.mpeg | **100.0%** | **100.0%** | **0.0%**         | `omision_total`           |
+| Audio 2.mpeg | **96.8%**  | **79.5%**  | **5.8%**         | `alucinacion_multilingue` |
+| Audio 3.mpeg | **100.0%** | **100.0%** | **0.0%**         | `omision_total`           |
+| **Mean**     | **98.9%**  | **93.2%**  | **1.9%**         | —                         |
+
 
 *Table 4. Quantitative comparison against segmented reference (`metricas_transcripcion.csv`).*
 
 **Aggregate summary (`resumen_metricas.csv`):**
+
 - Total audio segments: **3**
 - Mean WER: **98.9%**
 - Mean CER: **93.2%**
@@ -196,6 +207,7 @@ The reference conversation is linguistically and culturally dense: familial addr
 Feeding the Audio 2 hallucination into the kiosk LLM prompt produces a response unrelated to the user's actual request (e.g., generic advice rather than engagement with grief, family, or cultural practice). Feeding empty strings from Audio 1 and 3 forces the LLM to hallucinate from vacuous input entirely.
 
 **Expected domino-effect classes:**
+
 - **Confident misfit** — Answers a question never asked.
 - **Generic filler** — Boilerplate guidance disconnected from garbled input.
 - **False completion** — Treats noise as a complete request.
@@ -226,19 +238,22 @@ Our results demonstrate that **voice AI safety cannot be assessed at the LLM lay
 For a user seeking help with grief, cultural practice, or local services, this compound failure is not a usability bug—it is a **dignity and safety harm**.
 
 **Policy implications:**
+
 - Mandate dialect-inclusive ASR benchmarks before public kiosk deployment.
 - Treat empty ASR output on successful API calls as a critical failure, not a null event.
 - Require end-to-end voice pipeline audits in Global South safety evaluations.
 
 ### Limitations
 
-| Limitation | Impact | Future work |
-|---|---|---|
-| Pilot N=3 | No statistical generalization | Expand to 50–100 annotated narratives |
-| Manual segment alignment | Segment WER may shift slightly | Forced alignment (e.g., MFA) |
-| Single conversation type | Emotional oral narrative only | Add service-request scenarios |
-| Colab + Groq dependency | Vendor/model churn | Pin versions; test offline models |
-| Stage 2 requires API key | LLM results judge-dependent | Publish sample `evaluacion_impacto_final.csv` |
+
+| Limitation               | Impact                         | Future work                                   |
+| ------------------------ | ------------------------------ | --------------------------------------------- |
+| Pilot N=3                | No statistical generalization  | Expand to 50–100 annotated narratives         |
+| Manual segment alignment | Segment WER may shift slightly | Forced alignment (e.g., MFA)                  |
+| Single conversation type | Emotional oral narrative only  | Add service-request scenarios                 |
+| Colab + Groq dependency  | Vendor/model churn             | Pin versions; test offline models             |
+| Stage 2 requires API key | LLM results judge-dependent    | Publish sample `evaluacion_impacto_final.csv` |
+
 
 ### Future Work
 
@@ -253,21 +268,23 @@ We presented **Eval Whisper Yucatan**, a reproducible framework for quantifying 
 
 ## Code and Data
 
-| Artifact | Path |
-|---|---|
-| Repository | https://github.com/robertobalmessol1s/Global-south-hackathonAI-safety-Equipo-ZINT |
-| Reference transcript | `datos/transcripcion_referencia.txt` |
-| Segment mapping | `datos/segmentos_referencia.json` |
-| ASR script | `main.py` |
-| Comparison script | `comparar_transcripciones.py` |
-| LLM impact script | `analisis_alucinaciones.py` |
-| Colab ASR output | `resultados_colab.csv` |
-| Per-audio metrics | `metricas_transcripcion.csv` |
-| Aggregate summary | `resumen_metricas.csv` |
-| Figure 2 | `grafica_wer_por_audio.png` |
-| Figure 3 | `grafica_patrones_error.png` |
-| Figure 4 | `longitud_respuestas.png` |
-| Dependencies | `requirements.txt` |
+
+| Artifact             | Path                                                                                                                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository           | [https://github.com/robertobalmessol1s/Global-south-hackathonAI-safety-Equipo-ZINT](https://github.com/robertobalmessol1s/Global-south-hackathonAI-safety-Equipo-ZINT) |
+| Reference transcript | `datos/transcripcion_referencia.txt`                                                                                                                                   |
+| Segment mapping      | `datos/segmentos_referencia.json`                                                                                                                                      |
+| ASR script           | `main.py`                                                                                                                                                              |
+| Comparison script    | `comparar_transcripciones.py`                                                                                                                                          |
+| LLM impact script    | `analisis_alucinaciones.py`                                                                                                                                            |
+| Colab ASR output     | `resultados_colab.csv`                                                                                                                                                 |
+| Per-audio metrics    | `metricas_transcripcion.csv`                                                                                                                                           |
+| Aggregate summary    | `resumen_metricas.csv`                                                                                                                                                 |
+| Figure 2             | `grafica_wer_por_audio.png`                                                                                                                                            |
+| Figure 3             | `grafica_patrones_error.png`                                                                                                                                           |
+| Figure 4             | `longitud_respuestas.png`                                                                                                                                              |
+| Dependencies         | `requirements.txt`                                                                                                                                                     |
+
 
 ## Author Contributions
 
@@ -276,13 +293,13 @@ We presented **Eval Whisper Yucatan**, a reproducible framework for quantifying 
 
 ## References
 
-- Blodgett, S. L., Barocas, S., Daumé III, H., & Wallach, H. (2020). Language (Technology) is Power: A Critical Look at "Bias" in NLP. *ACL*. https://aclanthology.org/2020.acl-main.647/
-- Global South AI Safety Hackathon. (2026). https://globalsouthhackathon.com/
-- Groq. (2025–2026). GroqCloud Models Documentation. https://console.groq.com/docs/models
-- Ji, Z., et al. (2023). Survey of Hallucination in Natural Language Generation. *ACM Computing Surveys*. https://doi.org/10.1145/3571730
-- Joshi, P., et al. (2020). The State and Fate of Linguistic Diversity and Inclusion in the NLP World. *ACL*. https://aclanthology.org/2020.acl-main.653/
-- Koenecke, A., et al. (2020). Racial Disparities in Automated Speech Recognition. *PNAS*. https://doi.org/10.1073/pnas.1915768117
-- Radford, A., et al. (2023). Robust Speech Recognition via Large-Scale Weak Supervision. *ICML*. https://proceedings.mlr.press/v202/radford23a.html
+- Blodgett, S. L., Barocas, S., Daumé III, H., & Wallach, H. (2020). Language (Technology) is Power: A Critical Look at "Bias" in NLP. *ACL*. [https://aclanthology.org/2020.acl-main.647/](https://aclanthology.org/2020.acl-main.647/)
+- Global South AI Safety Hackathon. (2026). [https://globalsouthhackathon.com/](https://globalsouthhackathon.com/)
+- Groq. (2025–2026). GroqCloud Models Documentation. [https://console.groq.com/docs/models](https://console.groq.com/docs/models)
+- Ji, Z., et al. (2023). Survey of Hallucination in Natural Language Generation. *ACM Computing Surveys*. [https://doi.org/10.1145/3571730](https://doi.org/10.1145/3571730)
+- Joshi, P., et al. (2020). The State and Fate of Linguistic Diversity and Inclusion in the NLP World. *ACL*. [https://aclanthology.org/2020.acl-main.653/](https://aclanthology.org/2020.acl-main.653/)
+- Koenecke, A., et al. (2020). Racial Disparities in Automated Speech Recognition. *PNAS*. [https://doi.org/10.1073/pnas.1915768117](https://doi.org/10.1073/pnas.1915768117)
+- Radford, A., et al. (2023). Robust Speech Recognition via Large-Scale Weak Supervision. *ICML*. [https://proceedings.mlr.press/v202/radford23a.html](https://proceedings.mlr.press/v202/radford23a.html)
 
 ## Appendix A — Reference Excerpt (Spanish)
 
@@ -309,9 +326,9 @@ have the blessings that allow.
 
 ## Appendix C — Output Schema
 
-**`metricas_transcripcion.csv`:** `Nombre_Archivo`, `Referencia_Segmento`, `Transcripcion_Whisper`, `WER_Segmento`, `CER_Segmento`, `Cobertura_Lexica_Segmento`, `Patron_Error`, ...
+`**metricas_transcripcion.csv`:** `Nombre_Archivo`, `Referencia_Segmento`, `Transcripcion_Whisper`, `WER_Segmento`, `CER_Segmento`, `Cobertura_Lexica_Segmento`, `Patron_Error`, ...
 
-**`evaluacion_impacto_final.csv`:** above plus `Respuesta_LLM`
+`**evaluacion_impacto_final.csv`:** above plus `Respuesta_LLM`
 
 ---
 
