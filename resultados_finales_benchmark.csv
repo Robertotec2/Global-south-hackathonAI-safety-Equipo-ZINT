@@ -1,0 +1,26 @@
+﻿Archivo,Texto_Oficial,Transcripcion_Whisper,Transcripcion_Gemini,WER_Whisper,WER_Gemini,Reduccion_Error,Archivo_Oficial
+Audio1.mpeg,"Cuenta que hace muchos años todos los animales deseaban conocer el fuego
+Que se encontraba en el cerro mas alto.
+Tras un consenso, los animales mandaron un sapo a explorarlo 
+Pues creían que vivir en el agua le ayudaría a no quemarse.
+Despues de mucho tiempo, el sapo logro tomar una llama, pero al volver la apago con el agua que traía en el hocico.
+Entonces la zorra sugirió que, en el próximo viaje, la gallina lo acompañara
+Para que avivara el fuego agitando sus alas.
+El plan resulto, pero al mostrarla 
+Cayo en la cola del tlacuache,
+Quien al sentir la lumbre corrió por el monte dispersándola.
+Gracias a este suceso ahora tenemos fuego
+Y al tlacuache con la cola pelada y amarilla como la conocemos.
+Asi lo cuentan los yoremes",,Cuenta que hace muchos años todos los animales deseaban conocer el fuego,1.0,0.9091,9.09,TranscripcionOficialAudio1.txt
+Audio2.mpeg,"Cuentan que hace muchos años,
+Ch'ujtiat, el señor del cielo,
+Creo la Tierra ya doce hombres inmortales para cargarla sobre sus hombros.
+Cuando estos se cansan y la cambian de posición se originan los temblores.
+Mas tarde creo a los primeros hombres mortales,
+Pero fueron inigratos con el y les mando el diluvio;
+A los sobrevivientes los convirtió en monos
+Y a los niños que murieron, en estrellas.
+Creo entonces a los primeros padres los na'al, Ixic y Xum'Ok
+Quienes se multiplicaron y poblaron nuestro hogar.
+Fue así como comenzó la vida en la tierra.
+Asi lo cuentan los ch'oles.",transcripcion incorrecta whisper,Cuentan que hace muchos años Ch'ujtiat el señor del cielo,1.0,0.8942,10.58,TranscripcionOficialAudio2.txt
